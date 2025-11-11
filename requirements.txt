@@ -1,0 +1,14 @@
+# FastAPI Core
+fastapi[standard]
+uvicorn[standard]
+pydantic[standard]
+pydantic-settings[standard]
+alembic
+
+# Database
+sqlalchemy[standard]
+alembic[standard]
+psycopg2-binary
+
+python-jose[cryptography]
+passlib
