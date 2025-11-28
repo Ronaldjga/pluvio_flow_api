@@ -1,11 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
+from app.schemas.user import UserBase
 
-
-class RegisterRequest(BaseModel):
-    name: str
-    username: str = Field(min_length=3, max_length=15)
-    email: EmailStr
-    cpf: str = Field(min_length=11, max_length=11,)
+class RegisterRequest(UserBase):
     password: str = Field(min_length=6, max_length=128)
 
 
