@@ -165,3 +165,16 @@ class OccurrenceService:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erro ao ler imagem: {str(e)}")
+    
+    
+    def update_occurrence_status(self, occurrence_id: int, status: str):
+        occurrence = self.repository.get_by_id(occurrence_id)
+        occurrence.status = status
+        self.repository.db.commit()
+        self.repository.db.refresh(occurrence)
+        return occurrence
+
+    def delete_occurrence(self, occurrence_id: int):
+        occurrence = self.repository.get_by_id(occurrence_id)
+        self.repository.db.delete(occurrence)
+        self.repository.db.commit()

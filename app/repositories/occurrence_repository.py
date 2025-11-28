@@ -45,3 +45,6 @@ class OccurrenceRepository:
             )
             .all()
         )
+    
+    def get_by_id(self, occurrence_id: int):
+        return self.db.query(Occurrence).filter(Occurrence.id == occurrence_id).first()

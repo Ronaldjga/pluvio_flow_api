@@ -139,7 +139,7 @@ async def create_occurrence(
         "severity_id": severity_id,
         "latitude": latitude,
         "longitude": longitude,
-        "status": "pendente"
+        "status": "pendente",
     }
 
     # Criar ocorrência
@@ -182,7 +182,7 @@ async def create_occurrence(
                                         "color": "#FFA500",
                                     },
                                     "image_binary": "base64_string...",
-                                    "image_mime_type": "image/jpeg"
+                                    "image_mime_type": "image/jpeg",
                                 },
                             }
                         ],
@@ -220,16 +220,10 @@ async def list_occurrences_geojson(
     responses={
         200: {
             "description": "Imagem binária da ocorrência",
-            "content": {
-                "image/jpeg": {},
-                "image/png": {},
-                "image/webp": {}
-            }
+            "content": {"image/jpeg": {}, "image/png": {}, "image/webp": {}},
         },
-        404: {
-            "description": "Ocorrência ou imagem não encontrada"
-        }
-    }
+        404: {"description": "Ocorrência ou imagem não encontrada"},
+    },
 )
 async def get_occurrence_image(
     occurrence_id: int,
@@ -315,3 +309,61 @@ async def list_severities(db: CurrentSession) -> list[dict]:
         }
         for severity in severities
     ]
+
+
+@router.patch(
+    "/{occurrence_id}/resolve",
+    summary="Marcar ocorrência como resolvida",
+    response_model=OccurrenceResponse,
+)
+async def resolve_occurrence(
+    occurrence_id: int,
+    occurrence_service: OccurrenceServiceDep,
+    current_user: CurrentUser,
+):
+    occurrence = occurrence_service.repository.get_by_id(occurrence_id)
+
+    if not occurrence:
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada.")
+
+    # Apenas dono pode resolver (opcional)
+    if occurrence.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Você não tem permissão para alterar esta ocorrência.",
+        )
+
+    if occurrence.status == "resolvida":
+        raise HTTPException(
+            status_code=400, detail="A ocorrência já está marcada como resolvida."
+        )
+
+    updated = occurrence_service.update_occurrence_status(occurrence_id, "resolvida")
+
+    return updated
+
+
+@router.delete(
+    "/{occurrence_id}",
+    summary="Excluir ocorrência",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_occurrence(
+    occurrence_id: int,
+    occurrence_service: OccurrenceServiceDep,
+    current_user: CurrentUser,
+):
+    occurrence = occurrence_service.repository.get_by_id(occurrence_id)
+
+    if not occurrence:
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada.")
+
+    # Apenas dono pode excluir
+    if occurrence.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Você não tem permissão para excluir esta ocorrência.",
+        )
+
+    occurrence_service.delete_occurrence(occurrence_id)
+    return
