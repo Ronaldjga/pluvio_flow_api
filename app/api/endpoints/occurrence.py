@@ -101,34 +101,6 @@ async def create_occurrence(
         ),
     ] = None,
 ) -> OccurrenceResponse:
-    """
-    Cria uma nova ocorrência urbana.
-
-    Este endpoint permite que usuários autenticados reportem problemas urbanos
-    como acúmulo de lixo, buracos, enchentes, etc. Os dados são validados e
-    uma imagem pode ser anexada opcionalmente.
-
-    Args:
-        occurrence_service: Serviço de ocorrências (injetado)
-        current_user: Usuário autenticado (injetado)
-        db: Sessão do banco de dados (injetado)
-        name: Nome/título da ocorrência
-        category: Categoria (lixo, enchente, buraco, etc.)
-        severity_id: ID do nível de severidade (1=leve, 2=moderada, 3=grave)
-        latitude: Coordenada de latitude
-        longitude: Coordenada de longitude
-        description: Descrição detalhada (opcional)
-        image: Arquivo de imagem (opcional)
-
-    Returns:
-        OccurrenceResponse: Dados da ocorrência criada
-
-    Raises:
-        HTTPException: 400 se severity_id não existir ou dados inválidos
-        HTTPException: 401 se usuário não estiver autenticado
-        HTTPException: 422 se houver erro de validação
-    """
-    # Validar existência do severity_id
     severity = db.query(Severity).filter(Severity.id == severity_id).first()
     if not severity:
         raise HTTPException(
@@ -184,7 +156,7 @@ async def create_occurrence(
     "/geojson",
     summary="Listar ocorrências em formato GeoJSON",
     description="Retorna todas as ocorrências cadastradas no formato GeoJSON, "
-    "adequado para visualização em mapas.",
+    "adequado para visualização em mapas. Inclui imagens em base64 para exibição direta.",
     responses={
         200: {
             "description": "Lista de ocorrências em formato GeoJSON",
@@ -209,6 +181,8 @@ async def create_occurrence(
                                         "name": "Moderada",
                                         "color": "#FFA500",
                                     },
+                                    "image_binary": "base64_string...",
+                                    "image_mime_type": "image/jpeg"
                                 },
                             }
                         ],
@@ -228,6 +202,8 @@ async def list_occurrences_geojson(
     como Leaflet, Mapbox, Google Maps, etc. Cada ocorrência é retornada
     como uma Feature com geometria Point e propriedades detalhadas.
 
+    Inclui as imagens em formato base64 para exibição direta no frontend.
+
     Args:
         occurrence_service: Serviço de ocorrências (injetado)
 
@@ -235,6 +211,44 @@ async def list_occurrences_geojson(
         dict: FeatureCollection GeoJSON com todas as ocorrências
     """
     return occurrence_service.list_occurrences_geojson()
+
+
+@router.get(
+    "/{occurrence_id}/image",
+    summary="Obter imagem da ocorrência",
+    description="Retorna a imagem binária de uma ocorrência específica.",
+    responses={
+        200: {
+            "description": "Imagem binária da ocorrência",
+            "content": {
+                "image/jpeg": {},
+                "image/png": {},
+                "image/webp": {}
+            }
+        },
+        404: {
+            "description": "Ocorrência ou imagem não encontrada"
+        }
+    }
+)
+async def get_occurrence_image(
+    occurrence_id: int,
+    occurrence_service: OccurrenceServiceDep,
+):
+    """
+    Retorna a imagem binária de uma ocorrência.
+
+    Este endpoint é útil quando você quer carregar a imagem separadamente
+    ou usar em tags <img> diretamente.
+
+    Args:
+        occurrence_id: ID da ocorrência
+        occurrence_service: Serviço de ocorrências (injetado)
+
+    Returns:
+        Response: Imagem binária com o content-type apropriado
+    """
+    return occurrence_service.get_occurrence_image(occurrence_id)
 
 
 @router.get(

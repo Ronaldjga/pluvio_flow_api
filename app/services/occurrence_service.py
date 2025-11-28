@@ -1,8 +1,10 @@
 from app.schemas.occurrence import OccurrenceCreate
 from app.repositories.occurrence_repository import OccurrenceRepository
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 import os
 from pathlib import Path
+import base64
+from fastapi.responses import Response
 
 class OccurrenceService:
     def __init__(self, repository: OccurrenceRepository):
@@ -32,7 +34,7 @@ class OccurrenceService:
 
             image_path = str(file_path)
 
-        # Agora envia o status também
+        # Cria a ocorrência no banco
         occurrence = self.repository.create(
             user_id=user_id,
             name=validated.name,
@@ -42,7 +44,7 @@ class OccurrenceService:
             latitude=validated.latitude,
             longitude=validated.longitude,
             image_path=image_path,
-            status=validated.status,  # 🔥 Importante
+            status=validated.status,
         )
 
         return occurrence
@@ -52,6 +54,31 @@ class OccurrenceService:
         
         features = []
         for occ in occurrences:
+            # Lê a imagem do arquivo se existir e converte para base64
+            image_binary = None
+            image_mime_type = None
+            
+            if occ.image_path and os.path.exists(occ.image_path):
+                try:
+                    with open(occ.image_path, "rb") as f:
+                        image_content = f.read()
+                    image_binary = base64.b64encode(image_content).decode('utf-8')
+                    
+                    # Determina o MIME type baseado na extensão do arquivo
+                    ext = os.path.splitext(occ.image_path)[1].lower()
+                    mime_types = {
+                        '.jpg': 'image/jpeg',
+                        '.jpeg': 'image/jpeg',
+                        '.png': 'image/png',
+                        '.gif': 'image/gif',
+                        '.bmp': 'image/bmp',
+                        '.webp': 'image/webp'
+                    }
+                    image_mime_type = mime_types.get(ext, 'image/jpeg')
+                    
+                except Exception as e:
+                    print(f"Erro ao ler imagem: {e}")
+
             features.append({
                 "type": "Feature",
                 "geometry": {
@@ -69,8 +96,10 @@ class OccurrenceService:
                         "name": occ.severity.name,
                         "color": occ.severity.color,
                     },
-                    "status": occ.status,  # 🔥 retorna também
+                    "status": occ.status,
                     "image_path": occ.image_path,
+                    "image_binary": image_binary,  # Binário da imagem em base64
+                    "image_mime_type": image_mime_type,  # Tipo MIME para exibição
                     "created_at": occ.created_at.isoformat(),
                     "user": {
                         "id": occ.user.id,
@@ -83,3 +112,34 @@ class OccurrenceService:
             "type": "FeatureCollection",
             "features": features
         }
+
+    def get_occurrence_image(self, occurrence_id: int):
+        """Retorna a imagem binária de uma ocorrência específica"""
+        occurrence = self.repository.get_by_id(occurrence_id)
+        
+        if not occurrence or not occurrence.image_path:
+            raise HTTPException(status_code=404, detail="Imagem não encontrada")
+        
+        if not os.path.exists(occurrence.image_path):
+            raise HTTPException(status_code=404, detail="Arquivo de imagem não encontrado")
+        
+        try:
+            with open(occurrence.image_path, "rb") as f:
+                image_content = f.read()
+            
+            # Determina o MIME type
+            ext = os.path.splitext(occurrence.image_path)[1].lower()
+            mime_types = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.bmp': 'image/bmp',
+                '.webp': 'image/webp'
+            }
+            media_type = mime_types.get(ext, 'image/jpeg')
+            
+            return Response(content=image_content, media_type=media_type)
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao ler imagem: {str(e)}")
