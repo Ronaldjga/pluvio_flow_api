@@ -2,21 +2,24 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Instalar dependências do sistema
+# Instalar libs essenciais p/ OpenCV headless
 RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
     gcc \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements e instalar dependências Python
+# Copiar requirements
 COPY requirements.txt .
+
+# Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código da aplicação
+# Copiar código fonte
 COPY . .
 
-# Expor porta
 EXPOSE 8000
 
-# Comando para rodar a aplicação
+# Iniciar FastAPI
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
