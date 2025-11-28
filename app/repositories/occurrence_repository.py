@@ -1,35 +1,47 @@
-from typing import List, Optional
-from sqlalchemy.orm import Session
+# app/repositories/occurrence_repository.py
+from sqlalchemy.orm import Session, joinedload
 from app.models.occurrence import Occurrence
-from app.schemas.occurrence import OccurrenceCreate
 
 class OccurrenceRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, user_id: int, data: OccurrenceCreate) -> Occurrence:
+    def create(
+        self,
+        user_id: int,
+        name: str,
+        category: str,
+        description: str | None,
+        severity_id: int,
+        latitude: float,
+        longitude: float,
+        image_path: str | None = None,
+        status: str = "pendente",  # 🔥 novo campo com default
+    ) -> Occurrence:
         occurrence = Occurrence(
             user_id=user_id,
-            name=data.name,
-            category=data.category,
-            description=data.description,
-            latitude=data.latitude,
-            longitude=data.longitude,
+            name=name,
+            category=category,
+            description=description,
+            severity_id=severity_id,
+            latitude=latitude,
+            longitude=longitude,
+            image_path=image_path,
+            status=status,  # 🔥 agora vai para o banco
         )
+        
         self.db.add(occurrence)
         self.db.commit()
         self.db.refresh(occurrence)
+        
         return occurrence
 
-    def get_all(self) -> List[Occurrence]:
-        return self.db.query(Occurrence).all()
-
-    def get_by_id(self, occurrence_id: int) -> Optional[Occurrence]:
-        return self.db.query(Occurrence).filter(Occurrence.id == occurrence_id).first()
-
-    def delete(self, occurrence_id: int):
-        occurrence = self.get_by_id(occurrence_id)
-        if occurrence:
-            self.db.delete(occurrence)
-            self.db.commit()
-        return occurrence
+    def get_all_with_user(self):
+        return (
+            self.db.query(Occurrence)
+            .options(
+                joinedload(Occurrence.user),
+                joinedload(Occurrence.severity)
+            )
+            .all()
+        )
